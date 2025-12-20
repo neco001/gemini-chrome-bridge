@@ -1,0 +1,30 @@
+{
+  "extName": { "message": "Gemini Brücke" },
+  "extDesc": { "message": "Web-Automatisierungsbrücke für Google Gemini" },
+  
+  "menu_verify": { "message": "🕵️ Überprüfung" },
+  "menu_fact_check": { "message": "🔍 Faktenprüfung" },
+  "prompt_fact_check": { "message": "Überprüfen Sie die Richtigkeit des untenstehenden Textes. Weisen Sie auf mögliche Fehler, falsche Darstellungen oder fehlende Kontexte hin. Seien Sie kritisch." },
+  
+  "menu_devil_adv": { "message": "😈 Des Teufels Advokat" },
+  "prompt_devil_adv": { "message": "Analysieren Sie diesen Text und finden Sie Lücken in der Argumentation, logische Fehler oder Schwachstellen. Greifen Sie die im Text aufgestellte These an (Des Teufels Advokat)." },
+  
+  "menu_explain": { "message": "🧠 Synthese" },
+  "menu_eli5": { "message": "👶 Erkläre es wie für ein Kind (ELI5)" },
+  "prompt_eli5": { "message": "Erklären Sie das ausgewählte Fragment mit einfachen Analogien, als ob Sie es einem intelligenten 12-Jährigen erklären würden. Vermeiden Sie Fachjargon." },
+  
+  "menu_tldr": { "message": "📋 Zusammenfassen (TL;DR)" },
+  "prompt_tldr": { "message": "Erstellen Sie eine prägnante Zusammenfassung in Stichpunkten, die nur die wichtigsten Informationen aus diesem Text enthält." },
+  
+  "menu_tone": { "message": "🎭 Tonanalyse" },
+  "menu_pass_aggro": { "message": "🌡️ Passiv-Aggressivitäts-Detektor" },
+  "prompt_pass_aggro": { "message": "Analysieren Sie den Ton der folgenden Aussage. Konzentrieren Sie sich darauf, passive Aggressivität, versteckte Beschwerden, Sarkasmus oder falsche Höflichkeit zu erkennen. Beurteilen Sie, ob die Absicht aufrichtig oder manipulativ ist." },
+  
+  "menu_lang": { "message": "🌍 Sprache" },
+  "menu_refine": { "message": "✨ Text verfeinern" },
+  "prompt_refine": { "message": "Korrigieren Sie grammatikalische und stilistische Fehler in diesem Text. Lassen Sie ihn professioneller und klarer klingen, aber behalten Sie unbedingt den ursprünglichen Sinn bei." },
+
+  "fab_placeholder": { "message": "Befehl eingeben... (Enter zum Senden)" },
+  "fab_context_label": { "message": "[KONTEXT]:" },
+  "fab_command_label": { "message": "[BEFEHL]:" }
+}

@@ -1,0 +1,42 @@
+{
+  "extName": { "message": "Gemini Bridge" },
+  "extDesc": { "message": "Web Automation Bridge for Google Gemini" },
+
+  "menu_verify": { "message": "🕵️ Verify" },
+  "menu_fact_check": { "message": "🔍 Fact Check" },
+  "prompt_fact_check": {
+    "message": "Verify the veracity of the text below. Point out potential errors, misrepresentations, or missing contexts. Be critical."
+  },
+
+  "menu_devil_adv": { "message": "😈 Devil's Advocate" },
+  "prompt_devil_adv": {
+    "message": "Analyze this text and find gaps in argumentation, logical fallacies, or weak points. Attack the thesis presented in the text (Devil's Advocate)."
+  },
+
+  "menu_explain": { "message": "🧠 Synthesis" },
+  "menu_eli5": { "message": "👶 Explain Like I'm 5 (ELI5)" },
+  "prompt_eli5": {
+    "message": "Explain the selected fragment using simple analogies, as if explaining to a smart 12-year-old. Skip jargon."
+  },
+
+  "menu_tldr": { "message": "📋 Summarize (TL;DR)" },
+  "prompt_tldr": {
+    "message": "Create a concise summary in bullet points containing only the most important information from this text."
+  },
+
+  "menu_tone": { "message": "🎭 Tone Analysis" },
+  "menu_pass_aggro": { "message": "🌡️ Passive Aggression Detector" },
+  "prompt_pass_aggro": {
+    "message": "Analyze the tone of the statement below. Focus on detecting passive aggression, hidden grievances, sarcasm, or fake politeness. Assess if the intention is sincere or manipulative."
+  },
+
+  "menu_lang": { "message": "🌍 Language" },
+  "menu_refine": { "message": "✨ Polish Text / Refine" },
+  "prompt_refine": {
+    "message": "Correct grammatical and stylistic errors in this text. Make it sound more professional and clear, but strictly maintain the original meaning."
+  },
+
+  "fab_placeholder": { "message": "Type a command... (Enter to send)" },
+  "fab_context_label": { "message": "[CONTEXT]:" },
+  "fab_command_label": { "message": "[COMMAND]:" }
+}

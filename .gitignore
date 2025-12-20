@@ -1,0 +1,18 @@
+# System files
+.DS_Store
+Thumbs.db
+
+# Chrome Extension metadata
+_metadata/
+
+# Python Virtual Environment
+venv/
+__pycache__/
+*.pyc
+
+# IDE settings
+.vscode/
+.idea/
+
+# Logs
+*.log

@@ -1,0 +1,30 @@
+{
+  "extName": { "message": "Puente Gemini" },
+  "extDesc": { "message": "Puente de automatización web para Google Gemini" },
+  
+  "menu_verify": { "message": "🕵️ Verificación" },
+  "menu_fact_check": { "message": "🔍 Verificación de hechos" },
+  "prompt_fact_check": { "message": "Verifique la veracidad del texto a continuación. Señale posibles errores, tergiversaciones o contextos faltantes. Sea crítico. Texto:\n\n%s" },
+  
+  "menu_devil_adv": { "message": "😈 Abogado del Diablo" },
+  "prompt_devil_adv": { "message": "Analice este texto y encuentre lagunas en la argumentación, falacias lógicas o puntos débiles. Ataque la tesis presentada en el texto (Abogado del Diablo). Texto:\n\n%s" },
+  
+  "menu_explain": { "message": "🧠 Síntesis" },
+  "menu_eli5": { "message": "👶 Explícamelo como si tuviera 5 años (ELI5)" },
+  "prompt_eli5": { "message": "Explique el fragmento seleccionado utilizando analogías simples, como si se lo explicara a un niño inteligente de 12 años. Omita la jerga. Texto:\n\n%s" },
+  
+  "menu_tldr": { "message": "📋 Resumir (TL;DR)" },
+  "prompt_tldr": { "message": "Cree un resumen conciso en viñetas que contenga solo la información más importante de este texto. Texto:\n\n%s" },
+  
+  "menu_tone": { "message": "🎭 Análisis de Tono" },
+  "menu_pass_aggro": { "message": "🌡️ Detector de Agresividad Pasiva" },
+  "prompt_pass_aggro": { "message": "Analice el tono de la siguiente declaración. Concéntrese en detectar agresividad pasiva, quejas ocultas, sarcasmo o falsa cortesía. Evalúe si la intención es sincera o manipuladora. Texto:\n\n%s" },
+  
+  "menu_lang": { "message": "🌍 Idioma" },
+  "menu_refine": { "message": "✨ Pulir texto" },
+  "prompt_refine": { "message": "Corrija errores gramaticales y estilísticos en este texto. Hágalo sonar más profesional y claro, pero mantenga estrictamente el significado original. Texto:\n\n%s" },
+
+  "fab_placeholder": { "message": "Escriba un comando... (Enter para enviar)" },
+  "fab_context_label": { "message": "[CONTEXTO]:" },
+  "fab_command_label": { "message": "[COMANDO]:" }
+}

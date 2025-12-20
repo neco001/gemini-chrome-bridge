@@ -29,13 +29,15 @@ function createFab() {
     const btn = document.createElement('button');
     btn.className = 'sparkle-btn';
     btn.innerHTML = '✨';
-    btn.title = "Ask Gemini Bridge";
+    btn.innerHTML = '✨';
+    btn.title = chrome.i18n.getMessage("extName");
 
     // 2. Input Window (Hidden by default)
     const windowDiv = document.createElement('div');
     windowDiv.className = 'prompt-window';
+    const placeholder = chrome.i18n.getMessage("fab_placeholder");
     windowDiv.innerHTML = `
-        <textarea placeholder="Wpisz polecenie... (Enter aby wysłać)"></textarea>
+        <textarea placeholder="${placeholder}"></textarea>
         <div class="actions">
             <button id="send">🚀</button>
         </div>
@@ -162,7 +164,14 @@ function createFab() {
             let finalPayload = context;
             // If user typed something, wrap it.
             if (userPrompt) {
-                finalPayload = `[KONTEKST]:\n${context}\n\n[POLECENIE]:\n${userPrompt}`;
+                const ctxLabel = chrome.i18n.getMessage("fab_context_label");
+                const cmdLabel = chrome.i18n.getMessage("fab_command_label");
+                finalPayload = `${cmdLabel}\n${userPrompt}\n\n${ctxLabel}\n\`\`\`text\n${context}\n\`\`\``;
+            } else {
+                 // Context only (e.g. just Explain this) - though usually FAB implies a custom command.
+                 // If sending RAW context without command, maybe just wrap it too?
+                 // Let's assume clear intention:
+                 finalPayload = `${context}`;
             }
 
             // Send to background

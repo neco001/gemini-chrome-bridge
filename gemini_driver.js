@@ -1,13 +1,16 @@
 // gemini_driver.js
 
-console.log("[Gemini Bridge] Driver loaded.");
-
 // Check if we are running in the Side Panel (iframe)
-const IS_SIDE_PANEL = window.name === 'gemini_side_panel' || window.top !== window.self;
+// window.name comes from the <iframe> tag in sidepanel.html
+// window.top !== window.self means we are inside an iframe
+const debugName = window.name;
+const debugIframe = window.top !== window.self;
+const IS_SIDE_PANEL = debugName === 'gemini_side_panel' || debugIframe;
+
 if (IS_SIDE_PANEL) {
-    console.log("[Gemini Bridge] Operating in Side Panel mode.");
+    console.log(`[Gemini Bridge] Operating in SIDE PANEL mode. (name="${debugName}", inIframe=${debugIframe})`);
 } else {
-    console.log("[Gemini Bridge] Operating in Main Tab mode (passive).");
+    console.log(`[Gemini Bridge] Operating in MAIN TAB mode. Ignored. (name="${debugName}", inIframe=${debugIframe})`);
 }
 
 // --- Selectors & Helpers ---
@@ -47,50 +50,62 @@ function findSendButton() {
 // --- Injection Logic ---
 
 async function injectPrompt(text) {
-    console.log("[Gemini Bridge] Attempting to inject prompt...");
+    try {
+        console.log("[Gemini Bridge] Attempting to inject prompt...");
 
-    // Retry logic for finding the input (it might take a moment to load)
-    let input = findInput();
-    let attempts = 0;
-    while (!input && attempts < 10) {
-        await new Promise(r => setTimeout(r, 500));
-        input = findInput();
-        attempts++;
-    }
-
-    if (!input) {
-        console.error("[Gemini Bridge] Error: Could not find input field.");
-        return;
-    }
-
-    // 1. Focus
-    input.focus();
-    await humanDelay(100, 200);
-
-    // 2. Insert Text
-    // This deprecated command is still the most reliable way to trigger 
-    // all the necessary internal events for React/Angular apps.
-    document.execCommand('insertText', false, text);
-
-    await humanDelay(300, 600);
-
-    // 3. Send
-    const sendBtn = findSendButton();
-    if (sendBtn) {
-        // Ensure the button is clickable
-        if (sendBtn.disabled || sendBtn.getAttribute('aria-disabled') === 'true') {
-            console.warn("[Gemini Bridge] Send button is disabled. Waiting...");
-            await new Promise(r => setTimeout(r, 1000));
+        // Retry logic for finding the input (it might take a moment to load)
+        let input = findInput();
+        let attempts = 0;
+        while (!input && attempts < 10) {
+            await new Promise(r => setTimeout(r, 500));
+            input = findInput();
+            attempts++;
         }
 
-        if (!sendBtn.disabled && sendBtn.getAttribute('aria-disabled') !== 'true') {
+        if (!input) {
+            console.error("[Gemini Bridge] Error: Could not find input field.");
+            return;
+        }
+
+        // 1. Focus
+        input.focus();
+        await humanDelay(100, 200);
+
+        // 2. Insert Text
+        document.execCommand('insertText', false, text);
+
+        await humanDelay(300, 600);
+
+        // 3. Send Logic (Robust)
+        // Re-query button repeatedly until it's ready
+        let sendBtn = findSendButton();
+        let waitAttempts = 0;
+        const maxWaitAttempts = 10; // 5 seconds max
+
+        while (waitAttempts < maxWaitAttempts) {
+            // Check if button exists and is enabled
+            const isDisabled = !sendBtn || sendBtn.disabled || sendBtn.getAttribute('aria-disabled') === 'true';
+
+            if (!isDisabled) {
+                break; // Ready to click!
+            }
+
+            console.log(`[Gemini Bridge] Waiting for Send button... (${waitAttempts + 1}/${maxWaitAttempts})`);
+            await new Promise(r => setTimeout(r, 500));
+            
+            // IMPORTANT: Re-query the DOM element because React might have re-rendered it
+            sendBtn = findSendButton(); 
+            waitAttempts++;
+        }
+
+        if (sendBtn && !sendBtn.disabled && sendBtn.getAttribute('aria-disabled') !== 'true') {
             sendBtn.click();
-            console.log("[Gemini Bridge] Prompt sent.");
+            console.log("[Gemini Bridge] Prompt sent successfully.");
         } else {
-            console.error("[Gemini Bridge] Send button is still disabled.");
+            console.error("[Gemini Bridge] Failed to send: Button not found or permanently disabled.");
         }
-    } else {
-        console.warn("[Gemini Bridge] Send button not found. You might need to press Enter manually.");
+    } catch (err) {
+        console.error("[Gemini Bridge] Critical error during injection:", err);
     }
 }
 

@@ -1,91 +1,134 @@
 // background.js
 
-// background.js
-
-const PROMPT_TEMPLATES = {
-  "verify-fact": "Zweryfikuj prawdziwość poniższego tekstu. Wskaż potencjalne błędy, przekłamania lub brakujące konteksty. Bądź krytyczny. Tekst:\n\n%s",
-  "verify-critique": "Przeanalizuj ten tekst i znajdź luki w argumentacji, błędy logiczne lub słabe punkty. Zaatakuj tezę postawioną w tekście (Adwokat Diabła). Tekst:\n\n%s",
-
-  "explain-eli5": "Wyjaśnij zaznaczony fragment używając prostych analogii, jakbyś tłumaczył to inteligentnemu 12-latkowi. Pomiń żargon. Tekst:\n\n%s",
-  "explain-tldr": "Stwórz zwięzłe podsumowanie w punktach (bullet points) zawierające tylko najważniejsze informacje z tego tekstu. Tekst:\n\n%s",
-
-  "tone-passive-aggressive": "Przeanalizuj ton poniższej wypowiedzi. Skup się na wykryciu pasywnej agresji, ukrytych pretensji, sarkazmu lub fałszywej uprzejmości. Oceń czy intencja jest szczera czy manipulacyjna. Tekst:\n\n%s",
-
-  "lang-refine": "Popraw błędy gramatyczne i stylistyczne w tym tekście. Spraw, by brzmiał bardziej profesjonalnie i klarownie, ale koniecznie zachowaj oryginalny sens. Tekst:\n\n%s"
+const PROMPT_TEMPLATES_KEYS = {
+  "verify-fact": "prompt_fact_check",
+  "verify-critique": "prompt_devil_adv",
+  "explain-eli5": "prompt_eli5",
+  "explain-tldr": "prompt_tldr",
+  "tone-passive-aggressive": "prompt_pass_aggro",
+  "lang-refine": "prompt_refine"
 };
 
-// Initialize context menu on installation
-chrome.runtime.onInstalled.addListener(() => {
-  // Parent item
-  chrome.contextMenus.create({
-    id: "gemini-bridge-root",
-    title: "Gemini Bridge",
-    contexts: ["selection"]
-  });
+// Cache for custom prompts to allow quick lookup on click
+let CUSTOM_PROMPTS_CACHE = {};
 
-  // 1. Weryfikacja
-  chrome.contextMenus.create({
-    id: "group-verify",
-    parentId: "gemini-bridge-root",
-    title: "🕵️ Weryfikacja",
-    contexts: ["selection"]
-  });
-  chrome.contextMenus.create({ id: "verify-fact", parentId: "group-verify", title: "🔍 Sprawdź Fakty", contexts: ["selection"] });
-  chrome.contextMenus.create({ id: "verify-critique", parentId: "group-verify", title: "😈 Adwokat Diabła", contexts: ["selection"] });
+// Function to rebuild the entire context menu
+function updateContextMenu() {
+  chrome.contextMenus.removeAll(() => {
+    // Parent item
+    chrome.contextMenus.create({
+      id: "gemini-bridge-root",
+      title: chrome.i18n.getMessage("extName"),
+      contexts: ["selection"]
+    });
 
-  // 2. Synteza
-  chrome.contextMenus.create({
-    id: "group-explain",
-    parentId: "gemini-bridge-root",
-    title: "🧠 Synteza",
-    contexts: ["selection"]
-  });
-  chrome.contextMenus.create({ id: "explain-eli5", parentId: "group-explain", title: "👶 Wyjaśnij jak dziecku (ELI5)", contexts: ["selection"] });
-  chrome.contextMenus.create({ id: "explain-tldr", parentId: "group-explain", title: "📋 Skróć (TL;DR)", contexts: ["selection"] });
+    // --- Standard Groups ---
 
-  // 3. Analiza Tonu (Nowe!)
-  chrome.contextMenus.create({
-    id: "group-tone",
-    parentId: "gemini-bridge-root",
-    title: "🎭 Analiza Tonu",
-    contexts: ["selection"]
-  });
-  chrome.contextMenus.create({ id: "tone-passive-aggressive", parentId: "group-tone", title: "🌡️ Detektor Pasywnej Agresji", contexts: ["selection"] });
+    // 1. Verify
+    chrome.contextMenus.create({
+      id: "group-verify",
+      parentId: "gemini-bridge-root",
+      title: chrome.i18n.getMessage("menu_verify"),
+      contexts: ["selection"]
+    });
+    chrome.contextMenus.create({ id: "verify-fact", parentId: "group-verify", title: chrome.i18n.getMessage("menu_fact_check"), contexts: ["selection"] });
+    chrome.contextMenus.create({ id: "verify-critique", parentId: "group-verify", title: chrome.i18n.getMessage("menu_devil_adv"), contexts: ["selection"] });
 
-  // 4. Język
-  chrome.contextMenus.create({
-    id: "group-lang",
-    parentId: "gemini-bridge-root",
-    title: "🌍 Język",
-    contexts: ["selection"]
+    // 2. Explain
+    chrome.contextMenus.create({
+      id: "group-explain",
+      parentId: "gemini-bridge-root",
+      title: chrome.i18n.getMessage("menu_explain"),
+      contexts: ["selection"]
+    });
+    chrome.contextMenus.create({ id: "explain-eli5", parentId: "group-explain", title: chrome.i18n.getMessage("menu_eli5"), contexts: ["selection"] });
+    chrome.contextMenus.create({ id: "explain-tldr", parentId: "group-explain", title: chrome.i18n.getMessage("menu_tldr"), contexts: ["selection"] });
+
+    // 3. Tone
+    chrome.contextMenus.create({
+      id: "group-tone",
+      parentId: "gemini-bridge-root",
+      title: chrome.i18n.getMessage("menu_tone"),
+      contexts: ["selection"]
+    });
+    chrome.contextMenus.create({ id: "tone-passive-aggressive", parentId: "group-tone", title: chrome.i18n.getMessage("menu_pass_aggro"), contexts: ["selection"] });
+
+    // 4. Lang
+    chrome.contextMenus.create({
+      id: "group-lang",
+      parentId: "gemini-bridge-root",
+      title: chrome.i18n.getMessage("menu_lang"),
+      contexts: ["selection"]
+    });
+    chrome.contextMenus.create({ id: "lang-refine", parentId: "group-lang", title: chrome.i18n.getMessage("menu_refine"), contexts: ["selection"] });
+
+    // --- Custom Prompts Group ---
+    chrome.storage.sync.get({ customPrompts: [] }, (items) => {
+      CUSTOM_PROMPTS_CACHE = {}; // Reset cache
+
+      if (items.customPrompts && items.customPrompts.length > 0) {
+        // Separator
+        chrome.contextMenus.create({
+           id: "sep-custom",
+           parentId: "gemini-bridge-root",
+           type: "separator",
+           contexts: ["selection"]
+        });
+
+        // Loop through user prompts
+        items.customPrompts.forEach(p => {
+            chrome.contextMenus.create({
+                id: p.id,
+                parentId: "gemini-bridge-root", // Add directly to root or make a "My Prompts" group? Root is faster access.
+                title: "★ " + p.title,
+                contexts: ["selection"]
+            });
+            CUSTOM_PROMPTS_CACHE[p.id] = p.prompt;
+        });
+      }
+    });
+
   });
-  chrome.contextMenus.create({ id: "lang-refine", parentId: "group-lang", title: "✨ Wypoleruj tekst", contexts: ["selection"] });
+}
+
+// Initialize context menu on installation or startup
+chrome.runtime.onInstalled.addListener(updateContextMenu);
+chrome.runtime.onStartup.addListener(updateContextMenu);
+
+// Listen for changes in options to rebuild menu immediately
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'sync' && changes.customPrompts) {
+        updateContextMenu();
+    }
 });
 
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.selectionText) {
     // 1. OPTIMISTIC OPEN: Open the side panel IMMEDIATELY.
-    // This must happen synchronously to satisfy the "User Gesture" requirement.
-    // We catch errors in case it's already open or blocked, but we don't await it.
     chrome.sidePanel.open({ tabId: tab.id }).catch((error) => {
       console.error("Side panel open error:", error);
     });
 
-    let finalPrompt = info.selectionText;
+    let finalPrompt = null;
 
-    // Check if clicked item maps to a template
-    if (PROMPT_TEMPLATES[info.menuItemId]) {
-      finalPrompt = PROMPT_TEMPLATES[info.menuItemId].replace("%s", info.selectionText);
-    } else {
-      if (!info.menuItemId.startsWith('gemini-bridge')) return;
-      if (!PROMPT_TEMPLATES[info.menuItemId]) return;
+    // A. Check Standard Templates
+    if (PROMPT_TEMPLATES_KEYS[info.menuItemId]) {
+      const messageKey = PROMPT_TEMPLATES_KEYS[info.menuItemId];
+      const pattern = chrome.i18n.getMessage(messageKey);
+      if (pattern) {
+        finalPrompt = `${pattern}\n\nText:\n\`\`\`text\n${info.selectionText}\n\`\`\``;
+      }
+    } 
+    // B. Check Custom Prompts
+    else if (CUSTOM_PROMPTS_CACHE[info.menuItemId]) {
+       const userPattern = CUSTOM_PROMPTS_CACHE[info.menuItemId];
+       finalPrompt = `${userPattern}\n\nText:\n\`\`\`text\n${info.selectionText}\n\`\`\``;
     }
 
-    // 2. DATA BRIDGE: REVERTING TO LOCAL STORAGE
-    // It appears content scripts (isolated world) might have issues accessing storage.session
-    // reliably in all contexts or it requires specific permissions/trusted contexts.
-    // For MV3 "Hacker Style" stability, we go back to the battle-tested local storage.
+    if (!finalPrompt) return; // Should not happen unless click on group parent
+
+    // 2. DATA BRIDGE
     console.log("Saving to local storage:", finalPrompt.substring(0, 50) + "...");
     chrome.storage.local.set({
       pendingPrompt: {
@@ -102,19 +145,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "open_side_panel" && request.text) {
     console.log("FAB Clicked. Text:", request.text.substring(0, 20));
 
-    // OPTIMISTIC OPEN from Message
-    // Important: This might FAIL if not triggered by user gesture (click on FAB).
-    // Since the message comes from a 'mousedown'/'click' event in content script,
-    // Chrome *should* treat it as user gesture.
     if (sender.tab) {
       chrome.sidePanel.open({ tabId: sender.tab.id }).catch((err) => {
         console.error("Failed to open panel from FAB:", err);
-        // Fallback? Maybe notify user.
       });
     }
 
-    // Save Data
-    // FAB is generic "Ask", so we don't have templates. Just raw text.
     chrome.storage.local.set({
       pendingPrompt: {
         text: request.text,

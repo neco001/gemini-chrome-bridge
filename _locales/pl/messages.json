@@ -1,0 +1,30 @@
+{
+  "extName": { "message": "Most Gemini" },
+  "extDesc": { "message": "Most automatyzacji dla Google Gemini" },
+  
+  "menu_verify": { "message": "🕵️ Weryfikacja" },
+  "menu_fact_check": { "message": "🔍 Sprawdź Fakty" },
+  "prompt_fact_check": { "message": "Zweryfikuj prawdziwość poniższego tekstu. Wskaż potencjalne błędy, przekłamania lub brakujące konteksty. Bądź krytyczny." },
+  
+  "menu_devil_adv": { "message": "😈 Adwokat Diabła" },
+  "prompt_devil_adv": { "message": "Przeanalizuj ten tekst i znajdź luki w argumentacji, błędy logiczne lub słabe punkty. Zaatakuj tezę postawioną w tekście (Adwokat Diabła)." },
+  
+  "menu_explain": { "message": "🧠 Synteza" },
+  "menu_eli5": { "message": "👶 Wyjaśnij jak dziecku (ELI5)" },
+  "prompt_eli5": { "message": "Wyjaśnij zaznaczony fragment używając prostych analogii, jakbyś tłumaczył to inteligentnemu 12-latkowi. Pomiń żargon." },
+  
+  "menu_tldr": { "message": "📋 Skróć (TL;DR)" },
+  "prompt_tldr": { "message": "Stwórz zwięzłe podsumowanie w punktach (bullet points) zawierające tylko najważniejsze informacje z tego tekstu." },
+  
+  "menu_tone": { "message": "🎭 Analiza Tonu" },
+  "menu_pass_aggro": { "message": "🌡️ Detektor Pasywnej Agresji" },
+  "prompt_pass_aggro": { "message": "Przeanalizuj ton poniższej wypowiedzi. Skup się na wykryciu pasywnej agresji, ukrytych pretensji, sarkazmu lub fałszywej uprzejmości. Oceń czy intencja jest szczera czy manipulacyjna." },
+  
+  "menu_lang": { "message": "🌍 Język" },
+  "menu_refine": { "message": "✨ Wypoleruj tekst" },
+  "prompt_refine": { "message": "Popraw błędy gramatyczne i stylistyczne w tym tekście. Spraw, by brzmiał bardziej profesjonalnie i klarownie, ale koniecznie zachowaj oryginalny sens." },
+
+  "fab_placeholder": { "message": "Wpisz polecenie... (Enter aby wysłać)" },
+  "fab_context_label": { "message": "[KONTEKST]:" },
+  "fab_command_label": { "message": "[POLECENIE]:" }
+}
