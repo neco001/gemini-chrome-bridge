@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini Bridge",
+  "version": "1.0.1",
+  "description": "Web Automation Bridge for Google Gemini",
+  "permissions": [
+    "sidePanel",
+    "contextMenus",
+    "storage",
+    "declarativeNetRequest"
+  ],
+  "host_permissions": [
+    "https://gemini.google.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "ruleset_1",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://gemini.google.com/*"
+      ],
+      "js": [
+        "gemini_driver.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "fab_script.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
