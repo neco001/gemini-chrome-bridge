@@ -2,26 +2,36 @@
 
 // Check if we are running in the Side Panel (iframe)
 // window.name comes from the <iframe> tag in sidepanel.html
-// window.top !== window.self means we are inside an iframe
 const debugName = window.name;
 const debugIframe = window.top !== window.self;
-const IS_SIDE_PANEL = debugName === 'gemini_side_panel' || debugIframe;
+
+// Strict check: Only the actual iframe we created in sidepanel.html should be the driver.
+// Nested iframes (ads, login, gtm) won't have this name.
+const IS_SIDE_PANEL = debugName === 'gemini_side_panel';
 
 if (IS_SIDE_PANEL) {
-    console.log(`[Gemini Bridge] Operating in SIDE PANEL mode. (name="${debugName}", inIframe=${debugIframe})`);
+    console.log(`[Gemini Bridge] Operating in SIDE PANEL mode. (name="${debugName}")`);
 } else {
-    console.log(`[Gemini Bridge] Operating in MAIN TAB mode. Ignored. (name="${debugName}", inIframe=${debugIframe})`);
+    // If we are in an iframe but NOT ours, log it as ignored utility frame
+    if (debugIframe) {
+         console.log(`[Gemini Bridge] Ignored nested iframe. (name="${debugName}")`);
+    } else {
+         console.log(`[Gemini Bridge] Operating in MAIN TAB mode. Ignored.`);
+    }
 }
 
 // --- Selectors & Helpers ---
 
 const SELECTORS = {
-    // Priority 1: Modern Rich Text Editor
+    // Priority 1: Modern Rich Text Editor (standard)
     richTextEditor: 'div[contenteditable="true"]',
     // Priority 2: Accessibility Role
     roleTextbox: 'div[role="textbox"]',
-    // Priority 3: Send Button
-    sendButton: 'button[aria-label="Send message"], button[aria-label="Submit"]'
+    // Priority 3: Gemini specific (sometimes it's a paragraph inside a wrapper)
+    geminiInput: 'rich-textarea p',
+    
+    // Buttons
+    sendButton: 'button[aria-label="Send message"], button[aria-label="Submit"], button[data-test-id="send-button"]'
 };
 
 function humanDelay(min = 300, max = 600) {
@@ -29,22 +39,23 @@ function humanDelay(min = 300, max = 600) {
 }
 
 function findInput() {
-    return document.querySelector(SELECTORS.richTextEditor) ||
-        document.querySelector(SELECTORS.roleTextbox);
+    // Try standard editable divs
+    let el = document.querySelector(SELECTORS.richTextEditor);
+    if (el) return el;
+    
+    el = document.querySelector(SELECTORS.roleTextbox);
+    if (el) return el;
+
+    // Try Gemini specific custom element structure
+    el = document.querySelector(SELECTORS.geminiInput);
+    if (el) return el;
+
+    return null;
 }
 
 function findSendButton() {
-    // Try explicit aria-label selectors first
-    let btn = document.querySelector('button[aria-label="Send message"]');
-    if (btn) return btn;
-
-    btn = document.querySelector('button[aria-label="Submit"]');
-    if (btn) return btn;
-
-    // Fallback: finding the send button relative to the input usually isn't reliable 
-    // due to shadow DOMs or complex hierarchies in Google apps, 
-    // so we stick to aria-labels which are fairly stable.
-    return null;
+    // Use the combined selector string which handles multiple attributes
+    return document.querySelector(SELECTORS.sendButton);
 }
 
 // --- Injection Logic ---

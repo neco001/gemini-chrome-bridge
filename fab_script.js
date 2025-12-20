@@ -149,10 +149,18 @@ function createFab() {
     // --- Interactions ---
 
     // 1. Expand on Click
+    // Use 'click' instead of 'mousedown' for stable toggle behavior
+    btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation(); // Prevent document click handler from firing
+        expandWindow();
+    });
+
+    // 2. Prevent selection loss issues
+    // If we click the button, we don't want the selection to be cleared by the browser
     btn.addEventListener('mousedown', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        expandWindow();
     });
 
     // 3. Send Logic
@@ -259,14 +267,24 @@ function hideFab(force = false) {
 
 // Event Listeners
 document.addEventListener('mouseup', (e) => {
-    // Ignore clicks inside our own FAB
-    if (fabContainer && fabContainer.host.contains(e.target)) return;
+    // Ignore clicks inside our own FAB (using composedPath for Shadow DOM support)
+    if (fabContainer) {
+        const path = e.composedPath();
+        if (path.includes(fabContainer.host)) return;
+    }
 
     // Get selection
     const selection = window.getSelection();
     const text = selection.toString().trim();
 
     if (text.length > 0) {
+        // Stability check: If selection hasn't changed and FAB is already there, don't move it.
+        // This prevents the button from jumping if you click-drag off it.
+        const isVisible = fabContainer && fabContainer.btn.classList.contains('visible');
+        if (text === lastSelection && isVisible) {
+            return;
+        }
+
         lastSelection = text;
         traceSelection = text; // Keep a trace for instructions
 
