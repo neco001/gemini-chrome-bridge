@@ -24,6 +24,14 @@ function updateContextMenu() {
 
     // --- Standard Groups ---
 
+    // 0. Custom Input (New)
+    chrome.contextMenus.create({
+      id: "custom-prompt-trigger",
+      parentId: "gemini-bridge-root",
+      title: "✎ " + chrome.i18n.getMessage("menu_custom_prompt") || "Własna instrukcja...",
+      contexts: ["selection"]
+    });
+
     // 1. Verify
     chrome.contextMenus.create({
       id: "group-verify",
@@ -104,38 +112,73 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener((info, tab) => {
+  // Handler for Custom Prompt (Floating Window)
+  // We DO NOT open the side panel yet. We wait for the user to type and click "Send".
+  // The "Send" action in content script will trigger "open_side_panel" message, which opens the panel.
+  if (info.menuItemId === "custom-prompt-trigger") {
+      chrome.tabs.sendMessage(tab.id, { 
+          action: "show_floating_input", 
+          selectionText: info.selectionText 
+      });
+      return; 
+  }
+
+  // Handler for Standard Templates (TL;DR, Explain, etc.)
   if (info.selectionText) {
-    // 1. OPTIMISTIC OPEN: Open the side panel IMMEDIATELY.
+    // 1. Open the side panel IMMEDIATELY for these direct actions.
     chrome.sidePanel.open({ tabId: tab.id }).catch((error) => {
       console.error("Side panel open error:", error);
     });
 
-    let finalPrompt = null;
+    // Helper to process and save the final prompt
+    const savePrompt = (selection, context) => {
+        let finalPrompt = null;
+        
+        // Prepare context text
+        let contentPart = "";
+        if (context && context.trim() !== selection.trim()) {
+            contentPart = `Context:\n\`\`\`text\n${context}\n\`\`\`\n\nTarget:\n\`\`\`text\n${selection}\n\`\`\``;
+        } else {
+             contentPart = `Text:\n\`\`\`text\n${selection}\n\`\`\``;
+        }
 
-    // A. Check Standard Templates
-    if (PROMPT_TEMPLATES_KEYS[info.menuItemId]) {
-      const messageKey = PROMPT_TEMPLATES_KEYS[info.menuItemId];
-      const pattern = chrome.i18n.getMessage(messageKey);
-      if (pattern) {
-        finalPrompt = `${pattern}\n\nText:\n\`\`\`text\n${info.selectionText}\n\`\`\``;
-      }
-    } 
-    // B. Check Custom Prompts
-    else if (CUSTOM_PROMPTS_CACHE[info.menuItemId]) {
-       const userPattern = CUSTOM_PROMPTS_CACHE[info.menuItemId];
-       finalPrompt = `${userPattern}\n\nText:\n\`\`\`text\n${info.selectionText}\n\`\`\``;
-    }
+        // A. Check Standard Templates
+        if (PROMPT_TEMPLATES_KEYS[info.menuItemId]) {
+          const messageKey = PROMPT_TEMPLATES_KEYS[info.menuItemId];
+          const pattern = chrome.i18n.getMessage(messageKey);
+          if (pattern) {
+            finalPrompt = `${pattern}\n\n${contentPart}`;
+          }
+        } 
+        // B. Check Custom Prompts (from Context Menu options, not floating window)
+        else if (CUSTOM_PROMPTS_CACHE[info.menuItemId]) {
+           const userPattern = CUSTOM_PROMPTS_CACHE[info.menuItemId];
+           finalPrompt = `${userPattern}\n\n${contentPart}`;
+        }
 
-    if (!finalPrompt) return; // Should not happen unless click on group parent
+        if (!finalPrompt) return;
 
-    // 2. DATA BRIDGE
-    console.log("Saving to local storage:", finalPrompt.substring(0, 50) + "...");
-    chrome.storage.local.set({
-      pendingPrompt: {
-        text: finalPrompt,
-        timestamp: Date.now(),
-        status: "pending"
-      }
+        // 2. DATA BRIDGE
+        console.log("Saving to local storage:", finalPrompt.substring(0, 50) + "...");
+        chrome.storage.local.set({
+          pendingPrompt: {
+            text: finalPrompt,
+            timestamp: Date.now(),
+            status: "pending"
+          }
+        });
+    };
+
+    // Attempt to get richer context from the content script
+    chrome.tabs.sendMessage(tab.id, { action: "get_selection_context" }, (response) => {
+        if (chrome.runtime.lastError || !response) {
+            // Fallback to standard info.selectionText if script not ready/blocked
+            console.warn("Context fetch failed, using fallback:", chrome.runtime.lastError);
+            savePrompt(info.selectionText, null);
+        } else {
+            // Use rich context
+            savePrompt(response.selection, response.context);
+        }
     });
   }
 });

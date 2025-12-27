@@ -1,199 +1,241 @@
-// fab_script.js
+// gemini_content_ui.js (formerly fab_script.js)
 
 // Configuration
-const FAB_ID = 'gemini-bridge-fab-container';
-const BTN_SIZE = 32;
+const UI_ID = 'gemini-bridge-ui-host';
 
 // State
-let lastSelection = "";
-let traceSelection = ""; // Keep track of selection even if lost focus
-let fabContainer = null;
-let isExpanded = false;
+let uiContainer = null;
+let lastContextData = { selection: "", context: "" };
 
-function createFab() {
-    if (fabContainer) return;
+/**
+ * Helper to extract context from current selection
+ * Reused by both the message listener and the internal UI
+ */
+function getContextFromSelection() {
+    const selection = window.getSelection();
+    let selectedText = "";
+    let contextText = "";
 
-    // Create host for Shadow DOM
+    if (selection && selection.rangeCount > 0 && selection.toString().trim().length > 0) {
+        selectedText = selection.toString();
+        
+        try {
+            const range = selection.getRangeAt(0);
+            let node = range.commonAncestorContainer;
+            
+            if (node.nodeType === 3) { // Text node
+                node = node.parentElement;
+            }
+
+            const blockTags = ["P", "DIV", "ARTICLE", "SECTION", "BLOCKQUOTE", "LI", "H1", "H2", "H3", "H4", "H5", "H6", "TD", "PRE", "CODE"];
+            
+            let contextNode = node;
+            while (contextNode && contextNode !== document.body && contextNode !== document.documentElement) {
+                if (blockTags.includes(contextNode.tagName)) {
+                    break;
+                }
+                contextNode = contextNode.parentElement;
+            }
+
+            if (contextNode) {
+                contextText = contextNode.innerText;
+            }
+
+        } catch (e) {
+            console.error("Error finding context:", e);
+        }
+    } 
+    
+    return { selection: selectedText, context: contextText };
+}
+
+
+function createUi() {
+    if (uiContainer) return;
+
     const host = document.createElement('div');
-    host.id = FAB_ID;
-    host.style.position = 'absolute';
+    host.id = UI_ID;
+    host.style.position = 'fixed'; // Fixed for viewport positioning
     host.style.zIndex = '2147483647';
     host.style.top = '0px';
     host.style.left = '0px';
-    host.style.pointerEvents = 'none'; // Pass through clicks when hidden
+    host.style.width = '0px';
+    host.style.height = '0px';
 
-    // Attach Shadow DOM
     const shadow = host.attachShadow({ mode: 'open' });
 
-    // 1. Sparkle Button
-    const btn = document.createElement('button');
-    btn.className = 'sparkle-btn';
-    btn.innerHTML = '✨';
-    btn.innerHTML = '✨';
-    btn.title = chrome.i18n.getMessage("extName");
-
-    // 2. Input Window (Hidden by default)
+    // Window UI
     const windowDiv = document.createElement('div');
     windowDiv.className = 'prompt-window';
-    const placeholder = chrome.i18n.getMessage("fab_placeholder");
+    
+    let placeholder = "Ask Gemini..."; // Default fallback
+    try {
+        if (chrome && chrome.i18n) {
+            placeholder = chrome.i18n.getMessage("fab_placeholder") || placeholder;
+        }
+    } catch (e) {
+        // Extension context invalidated
+        console.warn("Gemini Bridge: Extension context invalid, using default strings.");
+    }
+    
     windowDiv.innerHTML = `
-        <textarea placeholder="${placeholder}"></textarea>
+        <div class="header">
+            <span class="title">Gemini Bridge</span>
+            <button id="close" title="Close">✕</button>
+        </div>
+        <textarea id="prompt-input" placeholder="${placeholder}"></textarea>
+        <div class="preview" id="context-preview"></div>
         <div class="actions">
-            <button id="send">🚀</button>
+            <button id="send">🚀 Send</button>
         </div>
     `;
 
-    // Styles
     const style = document.createElement('style');
     style.textContent = `
-        /* Sparkle Button */
-        .sparkle-btn {
-            width: ${BTN_SIZE}px;
-            height: ${BTN_SIZE}px;
-            border-radius: 50%;
-            border: 1px solid #ddd;
-            background: linear-gradient(135deg, #FFF 0%, #F5F7FF 100%);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            cursor: pointer;
-            font-size: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.1s, opacity 0.2s;
-            opacity: 0;
-            pointer-events: auto;
-            transform: scale(0.8);
-            outline: none;
-            position: absolute;
-            top: 0;
-            left: 0;
-            display: flex;
-        }
-        .sparkle-btn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 12px rgba(30,144,255,0.3);
-            border-color: #4285f4;
-        }
-        .sparkle-btn.visible {
-            opacity: 1;
-            transform: scale(1);
-        }
-
-        /* Prompt Window */
         .prompt-window {
-            position: absolute;
-            top: 0;
-            left: ${BTN_SIZE + 10}px; /* Appears to the right of cursor anchor */
-            width: 250px;
+            position: fixed;
+            top: 15%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            width: 400px;
             background: white;
             border-radius: 12px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
             border: 1px solid #e0e0e0;
-            padding: 8px;
+            padding: 16px;
             display: none;
             flex-direction: column;
-            gap: 8px;
-            pointer-events: auto;
-            font-family: sans-serif;
+            gap: 12px;
+            font-family: system-ui, -apple-system, sans-serif;
             opacity: 0;
-            transform: translateY(10px);
             transition: opacity 0.2s, transform 0.2s;
         }
         .prompt-window.visible {
             display: flex;
             opacity: 1;
-            transform: translateY(0);
+            transform: translateX(-50%) translateY(0);
         }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #5f6368;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        #close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #999;
+            padding: 4px;
+        }
+        #close:hover { color: #333; }
+        
         textarea {
             width: 100%;
-            height: 60px;
-            border: 1px solid #ddd;
+            height: 80px;
+            border: 1px solid #ccc;
             border-radius: 8px;
-            padding: 8px;
-            font-size: 13px;
-            resize: none;
+            padding: 10px;
+            font-size: 14px;
+            resize: vertical;
             outline: none;
             box-sizing: border-box;
             font-family: inherit;
         }
         textarea:focus {
             border-color: #4285f4;
+            box-shadow: 0 0 0 2px rgba(66,133,244,0.2);
         }
+
+        .preview {
+            max-height: 100px;
+            overflow-y: auto;
+            background: #f1f3f4;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 11px;
+            color: #555;
+            white-space: pre-wrap;
+            display: none; /* hidden if empty */
+        }
+
         .actions {
             display: flex;
             justify-content: flex-end;
         }
         #send {
-            background: #4285f4;
+            background: #1a73e8;
             color: white;
             border: none;
             border-radius: 6px;
-            padding: 4px 12px;
+            padding: 8px 20px;
             cursor: pointer;
-            font-weight: bold;
+            font-weight: 600;
+            font-size: 13px;
+            transition: background 0.2s;
         }
         #send:hover {
-            background: #3367d6;
+            background: #1557b0;
         }
     `;
 
     shadow.appendChild(style);
-    shadow.appendChild(btn);
     shadow.appendChild(windowDiv);
     document.body.appendChild(host);
 
-    fabContainer = { host, shadow, btn, windowDiv };
-    const textarea = windowDiv.querySelector('textarea');
+    uiContainer = { host, shadow, windowDiv };
+    
+    // Elements
+    const textarea = windowDiv.querySelector('#prompt-input');
     const sendBtn = windowDiv.querySelector('#send');
+    const closeBtn = windowDiv.querySelector('#close');
+    const preview = windowDiv.querySelector('#context-preview');
 
-    // --- Interactions ---
+    // -- Bind Interactions --
 
-    // 1. Expand on Click
-    // Use 'click' instead of 'mousedown' for stable toggle behavior
-    btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation(); // Prevent document click handler from firing
-        expandWindow();
-    });
-
-    // 2. Prevent selection loss issues
-    // If we click the button, we don't want the selection to be cleared by the browser
-    btn.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-    });
-
-    // 3. Send Logic
-    const performSend = () => {
-        const userPrompt = textarea.value.trim();
-        const context = traceSelection || lastSelection;
-
-        if (context) {
-            let finalPayload = context;
-            // If user typed something, wrap it.
-            if (userPrompt) {
-                const ctxLabel = chrome.i18n.getMessage("fab_context_label");
-                const cmdLabel = chrome.i18n.getMessage("fab_command_label");
-                finalPayload = `${cmdLabel}\n${userPrompt}\n\n${ctxLabel}\n\`\`\`text\n${context}\n\`\`\``;
-            } else {
-                 // Context only (e.g. just Explain this) - though usually FAB implies a custom command.
-                 // If sending RAW context without command, maybe just wrap it too?
-                 // Let's assume clear intention:
-                 finalPayload = `${context}`;
+    const closeUi = () => {
+        windowDiv.classList.remove('visible');
+        setTimeout(() => { 
+            if (!windowDiv.classList.contains('visible')) {
+                windowDiv.style.display = 'none'; 
             }
-
-            // Send to background
-            chrome.runtime.sendMessage({
-                action: "open_side_panel",
-                text: finalPayload
-            });
-        }
-
-        // Reset and hide
-        textarea.value = '';
-        hideFab(true);
+        }, 200);
     };
 
+    const performSend = () => {
+        const userPrompt = textarea.value.trim();
+        const { selection, context } = lastContextData;
+
+        // Construct final payload
+        // Logic: Instruction + Context wrap
+        let finalPayload = "";
+        
+        const contentPart = (context && context.trim() !== selection.trim()) 
+            ? `Context:\n\`\`\`text\n${context}\n\`\`\`\n\nTarget:\n\`\`\`text\n${selection}\n\`\`\``
+            : `Text:\n\`\`\`text\n${selection}\n\`\`\``;
+
+        if (userPrompt) {
+            finalPayload = `${userPrompt}\n\n${contentPart}`;
+        } else {
+            // No instruction, just send content (?)
+            finalPayload = contentPart;
+        }
+
+        // Send to background
+        chrome.runtime.sendMessage({
+            action: "open_side_panel",
+            text: finalPayload
+        });
+
+        // Clear and close
+        textarea.value = '';
+        closeUi();
+    };
+
+    closeBtn.addEventListener('click', closeUi);
     sendBtn.addEventListener('click', performSend);
 
     textarea.addEventListener('keydown', (e) => {
@@ -202,105 +244,58 @@ function createFab() {
             performSend();
         }
         if (e.key === 'Escape') {
-            hideFab(true);
+            closeUi();
         }
     });
 
-    // Stop propagation in window to prevent closing on click inside
-    windowDiv.addEventListener('mousedown', e => e.stopPropagation());
-    windowDiv.addEventListener('mouseup', e => e.stopPropagation());
+    // Close on click outside (on the window background if we had a backdrop, but we don't)
+    // Actually, let's just listen to document mousedown if visible
 }
 
-function expandWindow() {
-    if (!fabContainer) return;
-    isExpanded = true;
+function showUi(initialSelection) {
+    if (!uiContainer) createUi();
+    
+    // Refresh Data
+    lastContextData = getContextFromSelection();
+    
+    // Fallback if selection was lost but passed via message
+    if (!lastContextData.selection && initialSelection) {
+        lastContextData.selection = initialSelection;
+    }
 
-    const { btn, windowDiv } = fabContainer;
+    const { windowDiv, shadow } = uiContainer;
+    const textarea = shadow.querySelector('#prompt-input');
+    const preview = shadow.querySelector('#context-preview');
 
-    // Hide button, show window
-    btn.style.display = 'none';
+    // Update Preview
+    if (lastContextData.context) {
+        preview.textContent = "Context captured: " + lastContextData.context.substring(0, 150) + "...";
+        preview.style.display = 'block';
+    } else {
+        preview.style.display = 'none';
+    }
+
+    windowDiv.style.display = 'flex';
+    // Trigger reflow
+    windowDiv.offsetHeight; 
     windowDiv.classList.add('visible');
 
-    // Focus textarea
-    setTimeout(() => {
-        const ta = windowDiv.querySelector('textarea');
-        ta.focus();
-    }, 50);
+    textarea.focus();
 }
 
-function showFab(x, y) {
-    if (!fabContainer) createFab();
 
-    // If expanded, don't move it around while typing
-    if (isExpanded) return;
+// --- Listeners ---
 
-    const { host, btn, windowDiv } = fabContainer;
-    host.style.left = `${x}px`;
-    host.style.top = `${y}px`;
-
-    // Ensure separate visibility states
-    btn.style.display = 'flex';
-    requestAnimationFrame(() => {
-        btn.classList.add('visible');
-    });
-}
-
-function hideFab(force = false) {
-    if (!fabContainer) return;
-
-    // If we are typing (expanded), don't hide on accidental mouse moves outside
-    // Only hide if Force (Send/Esc) or Selection Cleared
-    if (isExpanded && !force) return;
-
-    const { btn, windowDiv } = fabContainer;
-
-    btn.classList.remove('visible');
-    windowDiv.classList.remove('visible');
-
-    // Reset state after animation
-    setTimeout(() => {
-        if (!isExpanded) return; // Race condition check
-        btn.style.display = 'flex';
-        isExpanded = false;
-    }, 200);
-}
-
-// Event Listeners
-document.addEventListener('mouseup', (e) => {
-    // Ignore clicks inside our own FAB (using composedPath for Shadow DOM support)
-    if (fabContainer) {
-        const path = e.composedPath();
-        if (path.includes(fabContainer.host)) return;
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    // 1. Context Request (from Right Click standard menu)
+    if (request.action === "get_selection_context") {
+        const data = getContextFromSelection();
+        sendResponse(data);
+        return true;
     }
 
-    // Get selection
-    const selection = window.getSelection();
-    const text = selection.toString().trim();
-
-    if (text.length > 0) {
-        // Stability check: If selection hasn't changed and FAB is already there, don't move it.
-        // This prevents the button from jumping if you click-drag off it.
-        const isVisible = fabContainer && fabContainer.btn.classList.contains('visible');
-        if (text === lastSelection && isVisible) {
-            return;
-        }
-
-        lastSelection = text;
-        traceSelection = text; // Keep a trace for instructions
-
-        // Calculate position
-        const x = e.pageX + 10;
-        const y = e.pageY - 40;
-
-        showFab(x, y);
-    } else {
-        // Only hide if we aren't interfering with the window
-        // If user clicks away, we generally close everything
-        hideFab(true);
+    // 2. Show Custom Input (from Right Click "Custom Prompt")
+    if (request.action === "show_floating_input") {
+        showUi(request.selectionText);
     }
 });
-
-// Close on scroll to avoid floating weirdness
-document.addEventListener('scroll', () => {
-    if (!isExpanded) hideFab(true);
-}, { passive: true });

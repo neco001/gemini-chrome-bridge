@@ -31,7 +31,16 @@ const SELECTORS = {
     geminiInput: 'rich-textarea p',
     
     // Buttons
-    sendButton: 'button[aria-label="Send message"], button[aria-label="Submit"], button[data-test-id="send-button"]'
+    sendButton: `
+        button[aria-label*="Send"], 
+        button[aria-label*="Submit"], 
+        button[data-test-id="send-button"], 
+        button[aria-label*="Wyślij"],
+        div[role="button"][aria-label*="Send"],
+        div[role="button"][aria-label*="Wyślij"],
+        button:has(mat-icon[data-mat-icon-name="send"]),
+        button:has(svg[d*="M2.01"]) 
+    ` // svg path partial match for the send icon plane often used
 };
 
 function humanDelay(min = 300, max = 600) {
@@ -39,23 +48,29 @@ function humanDelay(min = 300, max = 600) {
 }
 
 function findInput() {
-    // Try standard editable divs
     let el = document.querySelector(SELECTORS.richTextEditor);
     if (el) return el;
-    
     el = document.querySelector(SELECTORS.roleTextbox);
     if (el) return el;
-
-    // Try Gemini specific custom element structure
     el = document.querySelector(SELECTORS.geminiInput);
     if (el) return el;
-
     return null;
 }
 
 function findSendButton() {
-    // Use the combined selector string which handles multiple attributes
-    return document.querySelector(SELECTORS.sendButton);
+    // 1. Try selector match
+    let btn = document.querySelector(SELECTORS.sendButton);
+    if (btn) return btn;
+
+    // 2. Fallback: Search by functionality/icon if selector fails
+    // (Expensive, so only do if needed)
+    const icons = document.querySelectorAll('mat-icon');
+    for (let icon of icons) {
+        if (icon.textContent.trim() === 'send' || icon.getAttribute('data-mat-icon-name') === 'send') {
+            return icon.closest('button');
+        }
+    }
+    return null;
 }
 
 // --- Injection Logic ---
@@ -64,7 +79,7 @@ async function injectPrompt(text) {
     try {
         console.log("[Gemini Bridge] Attempting to inject prompt...");
 
-        // Retry logic for finding the input (it might take a moment to load)
+        // Retry logic for finding input
         let input = findInput();
         let attempts = 0;
         while (!input && attempts < 10) {
@@ -78,34 +93,61 @@ async function injectPrompt(text) {
             return;
         }
 
-        // 1. Focus
         input.focus();
         await humanDelay(100, 200);
 
         // 2. Insert Text
+        // Method A: execCommand (Standard)
         document.execCommand('insertText', false, text);
+        
+        // Method B: Direct assignment fallback if empty (React sometimes blocks execCommand)
+        if (!input.textContent.trim()) {
+            input.textContent = text;
+        }
 
-        await humanDelay(300, 600);
+        // CRITICAL FIX: Robust event dispatching
+        const eventOpts = { bubbles: true, composed: true };
+        const events = [
+            new Event('input', eventOpts),
+            new Event('change', eventOpts),
+            new InputEvent('beforeinput', { ...eventOpts, inputType: 'insertText', data: text }),
+            // Key events often trigger validation
+            new KeyboardEvent('keydown', { ...eventOpts, key: ' ' }),
+            new KeyboardEvent('keyup', { ...eventOpts, key: ' ' })
+        ];
+        
+        events.forEach(evt => input.dispatchEvent(evt));
 
-        // 3. Send Logic (Robust)
-        // Re-query button repeatedly until it's ready
+        await humanDelay(500, 800);
+
+        // 3. Send Logic
         let sendBtn = findSendButton();
         let waitAttempts = 0;
-        const maxWaitAttempts = 10; // 5 seconds max
+        const maxWaitAttempts = 12;
 
         while (waitAttempts < maxWaitAttempts) {
-            // Check if button exists and is enabled
+            sendBtn = findSendButton();
+            
+            // Check state
             const isDisabled = !sendBtn || sendBtn.disabled || sendBtn.getAttribute('aria-disabled') === 'true';
 
-            if (!isDisabled) {
-                break; // Ready to click!
+            if (sendBtn && !isDisabled) {
+                break; // Ready!
+            }
+            
+            // Debugging failure
+            if (waitAttempts % 3 === 0) {
+                 const allBtns = Array.from(document.querySelectorAll('button')).map(b => `${b.ariaLabel || b.className}`);
+                 console.log(`[Gemini Bridge] Waiting for Send. Button found: ${!!sendBtn}, Disabled: ${isDisabled}. Visible buttons:`, allBtns.slice(0, 5));
             }
 
-            console.log(`[Gemini Bridge] Waiting for Send button... (${waitAttempts + 1}/${maxWaitAttempts})`);
+            // Retry "waking up" the input if stuck
+            if (waitAttempts === 5) {
+                console.log("[Gemini Bridge] Re-triggering input events...");
+                events.forEach(evt => input.dispatchEvent(evt));
+            }
+
             await new Promise(r => setTimeout(r, 500));
-            
-            // IMPORTANT: Re-query the DOM element because React might have re-rendered it
-            sendBtn = findSendButton(); 
             waitAttempts++;
         }
 
